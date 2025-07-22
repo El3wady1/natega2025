@@ -614,259 +614,235 @@
         
         <div class="signature">
             <div class="developer-info">
-                <img src="./img/img4.png" alt="Developer Avatar" class="developer-avatar">
+                <img src="/img/img4.png" alt="Developer Avatar" class="developer-avatar">
                 <span class="developer-name">مهندس محمود جمال العوضي</span>
                 <i class="fas fa-code" style="color: var(--primary-color);"></i>
             </div>
         </div>
     </div>
+<script>
+    let studentsData = [];
+    let currentTab = 'name';
 
-    <script>
-        let studentsData = [];
-        let currentTab = 'name';
-        
-        // تحميل الملف مباشرة من نفس المجلد
-        window.addEventListener('DOMContentLoaded', () => {
-            loadExcelData();
-        });
-        
-        function loadExcelData() {
-            const resultsContainer = document.getElementById('resultsContainer');
-            resultsContainer.innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p class="loading-text">جاري تحميل البيانات الرجاء الانتظار...</p>
-                </div>
-            `;
-            
-            fetch('natega.xlsx')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('تعذر تحميل الملف');
-                    }
-                    return response.arrayBuffer();
-                })
-                .then(data => {
-                    processExcel(data);
-                })
-                .catch(error => {
-                    resultsContainer.innerHTML = `
-                        <div class="no-results">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <p>حدث خطأ أثناء تحميل الملف</p>
-                            <p class="suggest">تأكد من وجود ملف natega.xlsx في نفس المجلد</p>
-                        </div>
-                    `;
-                    console.error('Error:', error);
-                });
-        }
-        
-        function processExcel(data) {
-            const resultsContainer = document.getElementById('resultsContainer');
-            
-            try {
-                const workbook = XLSX.read(data, { type: 'array' });
-                const firstSheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[firstSheetName];
-                
-                // تحويل الورقة إلى JSON
-                studentsData = XLSX.utils.sheet_to_json(worksheet);
-                
-                // تعديل أسماء الخانات إذا كانت تحتوي على ~
-                studentsData = studentsData.map(student => {
-                    const newStudent = {};
-                    Object.keys(student).forEach(key => {
-                        const newKey = key.replace(/~/g, '');
-                        newStudent[newKey] = student[key];
-                    });
-                    return newStudent;
-                });
-                
-                // إظهار رسالة نجاح التحميل لمدة ثانيتين ثم العودة للوضع الابتدائي
-                resultsContainer.innerHTML = `
-                    <div class="loading">
-                        <i class="fas fa-check-circle" style="color: var(--success-color); font-size: 3rem; margin-bottom: 20px;"></i>
-                        <p class="loading-text" style="color: var(--success-color);">تم تحميل البيانات بنجاح</p>
-                    </div>
-                `;
-                
-                setTimeout(() => {
-                    resultsContainer.innerHTML = `
-                        <div class="initial-state">
-                            <i class="fas fa-graduation-cap"></i>
-                            <p>تم تحميل ${studentsData.length} سجل بنجاح</p>
-                            <p class="hint">يمكنك الآن البدء بالبحث</p>
-                        </div>
-                    `;
-                }, 2000);
-                
-            } catch (error) {
+    // ✅ جديد: لتقسيم النتائج
+    let searchResults = [];
+    let currentOffset = 0;
+    const PAGE_SIZE = 20;
+
+    window.addEventListener('DOMContentLoaded', () => {
+        loadExcelData();
+    });
+
+    function loadExcelData() {
+        const resultsContainer = document.getElementById('resultsContainer');
+        resultsContainer.innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                <p class="loading-text">جاري تحميل البيانات الرجاء الانتظار...</p>
+            </div>
+        `;
+
+        fetch('natega.xlsx')
+            .then(response => {
+                if (!response.ok) throw new Error('تعذر تحميل الملف');
+                return response.arrayBuffer();
+            })
+            .then(data => processExcel(data))
+            .catch(error => {
                 resultsContainer.innerHTML = `
                     <div class="no-results">
-                        <i class="fas fa-exclamation-circle"></i>
-                        <p>حدث خطأ في قراءة الملف</p>
-                        <p class="suggest">يرجى التأكد من صحة تنسيق ملف Excel</p>
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>حدث خطأ أثناء تحميل الملف</p>
+                        <p class="suggest">تأكد من وجود ملف natega.xlsx في نفس المجلد</p>
                     </div>
                 `;
                 console.error('Error:', error);
-            }
-        }
-        
-        function switchTab(tab) {
-            currentTab = tab;
-            const searchInput = document.getElementById('searchInput');
-            
-            // تحديث الواجهة
-            document.getElementById('nameTab').classList.remove('active');
-            document.getElementById('seatTab').classList.remove('active');
-            document.getElementById(tab + 'Tab').classList.add('active');
-            
-            // تغيير النص التوضيحي حسب نوع البحث
-            if (tab === 'name') {
-                searchInput.placeholder = 'أدخل اسم الطالب للبحث...';
-            } else {
-                searchInput.placeholder = 'أدخل رقم الجلوس للبحث...';
-            }
-            
-            // إفراغ حقل البحث
-            searchInput.value = '';
-            searchInput.focus();
-        }
-        
-        function searchStudent() {
-            const searchInput = document.getElementById('searchInput').value.trim();
-            const resultsContainer = document.getElementById('resultsContainer');
-            
+            });
+    }
+
+    function processExcel(data) {
+        const resultsContainer = document.getElementById('resultsContainer');
+        try {
+            const workbook = XLSX.read(data, { type: 'array' });
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            studentsData = XLSX.utils.sheet_to_json(worksheet).map(student => {
+                const newStudent = {};
+                for (const key in student) {
+                    newStudent[key.replace(/~/g, '')] = student[key];
+                }
+                return newStudent;
+            });
+
             resultsContainer.innerHTML = `
                 <div class="loading">
-                    <div class="spinner"></div>
-                    <p class="loading-text">جاري البحث الرجاء الانتظار...</p>
+                    <i class="fas fa-check-circle" style="color: var(--success-color); font-size: 3rem; margin-bottom: 20px;"></i>
+                    <p class="loading-text" style="color: var(--success-color);">تم تحميل البيانات بنجاح</p>
                 </div>
             `;
-            
-            if (studentsData.length === 0) {
-                setTimeout(() => {
-                    resultsContainer.innerHTML = `
-                        <div class="no-results">
-                            <i class="fas fa-database"></i>
-                            <p>لا توجد بيانات متاحة للبحث</p>
-                            <p class="suggest">تأكد من تحميل ملف Excel بشكل صحيح</p>
-                        </div>
-                    `;
-                }, 500);
-                return;
-            }
-            
-            if (!searchInput) {
-                setTimeout(() => {
-                    resultsContainer.innerHTML = `
-                        <div class="no-results">
-                            <i class="fas fa-exclamation-circle"></i>
-                            <p>الرجاء إدخال ${currentTab === 'name' ? 'اسم الطالب' : 'رقم الجلوس'}</p>
-                        </div>
-                    `;
-                }, 500);
-                return;
-            }
-            
-            // البحث بعد تأخير بسيط لمحاكاة البحث في قاعدة بيانات كبيرة
+
             setTimeout(() => {
-                performSearch(searchInput);
-            }, 300);
+                resultsContainer.innerHTML = `
+                    <div class="initial-state">
+                        <i class="fas fa-graduation-cap"></i>
+                        <p>تم تحميل ${studentsData.length} سجل بنجاح</p>
+                        <p class="hint">يمكنك الآن البدء بالبحث</p>
+                    </div>
+                `;
+            }, 2000);
+        } catch (error) {
+            resultsContainer.innerHTML = `
+                <div class="no-results">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>حدث خطأ في قراءة الملف</p>
+                    <p class="suggest">يرجى التأكد من صحة تنسيق ملف Excel</p>
+                </div>
+            `;
+            console.error('Error:', error);
         }
-        
-        function performSearch(searchTerm) {
-            const resultsContainer = document.getElementById('resultsContainer');
-            let matchedStudents = [];
-            
-            if (currentTab === 'name') {
-                // البحث بالاسم (حساسية أقل للحروف)
-                matchedStudents = studentsData.filter(student =>
-                    student.arabic_name && student.arabic_name.toLowerCase().includes(searchTerm.toLowerCase())
-                );
-            } else {
-                // البحث برقم الجلوس (مطابقة كاملة)
-                matchedStudents = studentsData.filter(student =>
-                    student.seating_no && student.seating_no.toString() === searchTerm
-                );
-            }
-            
-            if (matchedStudents.length === 0) {
+    }
+
+    function switchTab(tab) {
+        currentTab = tab;
+        const searchInput = document.getElementById('searchInput');
+        document.getElementById('nameTab').classList.remove('active');
+        document.getElementById('seatTab').classList.remove('active');
+        document.getElementById(tab + 'Tab').classList.add('active');
+        searchInput.placeholder = tab === 'name' ? 'أدخل اسم الطالب للبحث...' : 'أدخل رقم الجلوس للبحث...';
+        searchInput.value = '';
+        searchInput.focus();
+    }
+
+    function searchStudent() {
+        const input = document.getElementById('searchInput').value.trim();
+        const resultsContainer = document.getElementById('resultsContainer');
+
+        resultsContainer.innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                <p class="loading-text">جاري البحث الرجاء الانتظار...</p>
+            </div>
+        `;
+
+        if (!studentsData.length) {
+            setTimeout(() => {
                 resultsContainer.innerHTML = `
                     <div class="no-results">
-                        <i class="fas fa-search-minus"></i>
-                        <p>لا توجد نتائج مطابقة</p>
-                        <p class="suggest">تأكد من ${currentTab === 'name' ? 'اسم الطالب' : 'رقم الجلوس'} وأعد المحاولة</p>
+                        <i class="fas fa-database"></i>
+                        <p>لا توجد بيانات متاحة للبحث</p>
+                        <p class="suggest">تأكد من تحميل ملف Excel بشكل صحيح</p>
                     </div>
                 `;
-                return;
-            }
-            
-            // عرض النتائج
-            resultsContainer.innerHTML = '';
-            
-            matchedStudents.forEach((student, index) => {
-                const resultCard = document.createElement('div');
-                resultCard.className = 'student-result fade-in';
-                resultCard.style.animationDelay = `${index * 0.1}s`;
-                
-                // إنشاء عناصر المواد الدراسية
-                let subjectsHTML = '';
-                for (const key in student) {
-                    if (key !== 'arabic_name' && key !== 'seating_no' && key !== 'total_degree' && 
-                        !key.includes('~') && student[key] !== undefined && student[key] !== '') {
-                        const isFail = typeof student[key] === 'number' && student[key] < 50;
-                        subjectsHTML += `
-                            <div class="detail-item">
-                                <div class="detail-label">
-                                    <i class="fas fa-book"></i> ${key}
-                                </div>
-                                <div class="detail-value ${isFail ? 'subject-fail' : ''}">
-                                    ${student[key]} ${typeof student[key] === 'number' ? '/ 100' : ''}
-                                </div>
+            }, 500);
+            return;
+        }
+
+        if (!input) {
+            setTimeout(() => {
+                resultsContainer.innerHTML = `
+                    <div class="no-results">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <p>الرجاء إدخال ${currentTab === 'name' ? 'اسم الطالب' : 'رقم الجلوس'}</p>
+                    </div>
+                `;
+            }, 500);
+            return;
+        }
+
+        setTimeout(() => performSearch(input), 300);
+    }
+
+    function performSearch(searchTerm) {
+        const resultsContainer = document.getElementById('resultsContainer');
+        let matched = [];
+
+        if (currentTab === 'name') {
+            matched = studentsData.filter(s => s.arabic_name && s.arabic_name.toLowerCase().includes(searchTerm.toLowerCase()));
+        } else {
+            matched = studentsData.filter(s => s.seating_no && s.seating_no.toString() === searchTerm);
+        }
+
+        if (!matched.length) {
+            resultsContainer.innerHTML = `
+                <div class="no-results">
+                    <i class="fas fa-search-minus"></i>
+                    <p>لا توجد نتائج مطابقة</p>
+                    <p class="suggest">تأكد من ${currentTab === 'name' ? 'اسم الطالب' : 'رقم الجلوس'} وأعد المحاولة</p>
+                </div>
+            `;
+            return;
+        }
+
+        // تخزين النتائج
+        searchResults = matched;
+        currentOffset = 0;
+        resultsContainer.innerHTML = '';
+        renderResultsBatch();
+    }
+
+    function renderResultsBatch() {
+        const resultsContainer = document.getElementById('resultsContainer');
+        const batch = searchResults.slice(currentOffset, currentOffset + PAGE_SIZE);
+
+        batch.forEach((student, index) => {
+            const card = document.createElement('div');
+            card.className = 'student-result fade-in';
+            card.style.animationDelay = `${index * 0.05}s`;
+
+            let subjectsHTML = '';
+            for (const key in student) {
+                if (!['arabic_name', 'seating_no', 'total_degree'].includes(key) && student[key] !== undefined && student[key] !== '') {
+                    const isFail = typeof student[key] === 'number' && student[key] < 50;
+                    subjectsHTML += `
+                        <div class="detail-item">
+                            <div class="detail-label"><i class="fas fa-book"></i> ${key}</div>
+                            <div class="detail-value ${isFail ? 'subject-fail' : ''}">
+                                ${student[key]} ${typeof student[key] === 'number' ? '/ 100' : ''}
                             </div>
-                        `;
-                    }
+                        </div>
+                    `;
                 }
-                
-                resultCard.innerHTML = `
-                    <div class="student-header">
-                        <div class="student-name">${student.arabic_name || 'غير معروف'}</div>
-                        <div class="student-seat">
-                            <i class="fas fa-id-card"></i> ${student.seating_no || 'غير متوفر'}
-                        </div>
-                    </div>
-                    
-                    <div class="student-details">
-                        ${subjectsHTML}
-                        
-                        <div class="total-degree">
-                            <div class="total-label">
-                                <i class="fas fa-star"></i> المجموع الكلي
-                            </div>
-                            <div class="total-value">
-                                ${student.total_degree || '0'} / ${calculateMaxTotal()}
-                            </div>
-                        </div>
-                    </div>
-                `;
-                
-                resultsContainer.appendChild(resultCard);
-            });
-        }
-        
-        function calculateMaxTotal() {
-            // هذه الدالة تحسب أعلى مجموع ممكن (يمكن تعديلها حسب نظام الدرجات)
-            // هنا نفترض أن كل مادة درجتها العظمى 100 وعدد المواد 7
-            return 700;
-        }
-        
-        // السماح بالبحث بالضغط على Enter
-        document.getElementById('searchInput').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                searchStudent();
             }
+
+            card.innerHTML = `
+                <div class="student-header">
+                    <div class="student-name">${student.arabic_name || 'غير معروف'}</div>
+                    <div class="student-seat"><i class="fas fa-id-card"></i> ${student.seating_no || 'غير متوفر'}</div>
+                </div>
+                <div class="student-details">
+                    ${subjectsHTML}
+                    <div class="total-degree">
+                        <div class="total-label"><i class="fas fa-star"></i> المجموع الكلي</div>
+                        <div class="total-value">${student.total_degree || '0'} / ${calculateMaxTotal()}</div>
+                    </div>
+                </div>
+            `;
+
+            resultsContainer.appendChild(card);
         });
-    </script>
+
+        currentOffset += PAGE_SIZE;
+
+        if (currentOffset < searchResults.length) {
+            const loadMoreBtn = document.createElement('button');
+            loadMoreBtn.className = 'search-btn';
+            loadMoreBtn.style.margin = '20px auto';
+            loadMoreBtn.innerHTML = '<i class="fas fa-arrow-down"></i> عرض المزيد';
+            loadMoreBtn.onclick = () => {
+                loadMoreBtn.remove();
+                renderResultsBatch();
+            };
+            resultsContainer.appendChild(loadMoreBtn);
+        }
+    }
+
+    function calculateMaxTotal() {
+        return 700; 
+    }
+
+    document.getElementById('searchInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') searchStudent();
+    });
+</script>
+
 </body>
 </html>
