@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2025 نتيجة ثانوية</title>
+    <title> 2025 نتيجة ثانوية</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -47,7 +47,6 @@
             position: relative;
             overflow: hidden;
             transition: all 0.3s ease;
-            text-align: right;
         }
         
         .container:hover {
@@ -244,8 +243,7 @@
         
         .search-btn {
             position: absolute;
-            right: 5px;
-            left: auto;
+            left: 5px;
             top: 5px;
             bottom: 5px;
             background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
@@ -342,7 +340,6 @@
             margin-bottom: 20px;
             padding-bottom: 15px;
             border-bottom: 1px dashed #eee;
-            flex-direction: row-reverse;
         }
         
         .student-name {
@@ -623,250 +620,229 @@
             </div>
         </div>
     </div>
+<script>
+    let studentsData = [];
+    let currentTab = 'name';
 
-    <script>
-        let studentsData = [];
-        let currentTab = 'name';
-        let searchResults = [];
-        let currentOffset = 0;
-        const PAGE_SIZE = 10;
-        let searchTimeout;
-    
-        // Fallback data in case Excel fails to load
-        const fallbackData = [
-            {
-                arabic_name: "طالب تجريبي",
-                seating_no: "12345",
-                math: 85,
-                science: 90,
-                total_degree: 175
-            }
-        ];
-    
-        window.addEventListener('DOMContentLoaded', () => {
-            loadExcelData();
-        });
-    
-        function loadExcelData() {
-            const resultsContainer = document.getElementById('resultsContainer');
-            resultsContainer.innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p class="loading-text">جاري تحميل البيانات الرجاء الانتظار...</p>
-                </div>
-            `;
-    
-            fetch('natega.xlsx')
-                .then(response => {
-                    if (!response.ok) throw new Error('تعذر تحميل الملف');
-                    return response.arrayBuffer();
-                })
-                .then(data => {
-                    try {
-                        processExcel(data);
-                    } catch (e) {
-                        throw new Error('تنسيق ملف Excel غير صحيح');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    studentsData = fallbackData;
-                    resultsContainer.innerHTML = `
-                        <div class="initial-state">
-                            <i class="fas fa-info-circle" style="color: var(--warning-color);"></i>
-                            <p>تم تحميل بيانات تجريبية</p>
-                            <p class="hint">${error.message}</p>
-                        </div>
-                    `;
-                });
-        }
-    
-        function processExcel(data) {
-            const resultsContainer = document.getElementById('resultsContainer');
-            try {
-                const workbook = XLSX.read(data, { type: 'array' });
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                studentsData = XLSX.utils.sheet_to_json(worksheet).map(student => {
-                    const newStudent = {};
-                    for (const key in student) {
-                        newStudent[key.replace(/~/g, '')] = student[key];
-                    }
-                    return newStudent;
-                });
-    
-                // Verify required columns exist
-                const requiredColumns = ['arabic_name', 'seating_no'];
-                if (studentsData.length > 0 && !requiredColumns.every(col => col in studentsData[0])) {
-                    throw new Error('ملف Excel لا يحتوي على الأعمدة المطلوبة');
-                }
-    
+    // ✅ جديد: لتقسيم النتائج
+    let searchResults = [];
+    let currentOffset = 0;
+    const PAGE_SIZE = 20;
+
+    window.addEventListener('DOMContentLoaded', () => {
+        loadExcelData();
+    });
+
+    function loadExcelData() {
+        const resultsContainer = document.getElementById('resultsContainer');
+        resultsContainer.innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                <p class="loading-text">جاري تحميل البيانات الرجاء الانتظار...</p>
+            </div>
+        `;
+
+        fetch('natega.xlsx')
+            .then(response => {
+                if (!response.ok) throw new Error('تعذر تحميل الملف');
+                return response.arrayBuffer();
+            })
+            .then(data => processExcel(data))
+            .catch(error => {
                 resultsContainer.innerHTML = `
-                    <div class="loading">
-                        <i class="fas fa-check-circle" style="color: var(--success-color); font-size: 3rem; margin-bottom: 20px;"></i>
-                        <p class="loading-text" style="color: var(--success-color);">تم تحميل البيانات بنجاح</p>
+                    <div class="no-results">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>حدث خطأ أثناء تحميل الملف</p>
+                        <p class="suggest">تأكد من وجود ملف natega.xlsx في نفس المجلد</p>
                     </div>
                 `;
-    
-                setTimeout(() => {
-                    resultsContainer.innerHTML = `
-                        <div class="initial-state">
-                            <i class="fas fa-graduation-cap"></i>
-                            <p>تم تحميل ${studentsData.length} سجل بنجاح</p>
-                            <p class="hint">يمكنك الآن البدء بالبحث</p>
-                        </div>
-                    `;
-                }, 2000);
-            } catch (error) {
                 console.error('Error:', error);
-                studentsData = fallbackData;
+            });
+    }
+
+    function processExcel(data) {
+        const resultsContainer = document.getElementById('resultsContainer');
+        try {
+            const workbook = XLSX.read(data, { type: 'array' });
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            studentsData = XLSX.utils.sheet_to_json(worksheet).map(student => {
+                const newStudent = {};
+                for (const key in student) {
+                    newStudent[key.replace(/~/g, '')] = student[key];
+                }
+                return newStudent;
+            });
+
+            resultsContainer.innerHTML = `
+                <div class="loading">
+                    <i class="fas fa-check-circle" style="color: var(--success-color); font-size: 3rem; margin-bottom: 20px;"></i>
+                    <p class="loading-text" style="color: var(--success-color);">تم تحميل البيانات بنجاح</p>
+                </div>
+            `;
+
+            setTimeout(() => {
+                resultsContainer.innerHTML = `
+                    <div class="initial-state">
+                        <i class="fas fa-graduation-cap"></i>
+                        <p>تم تحميل ${studentsData.length} سجل بنجاح</p>
+                        <p class="hint">يمكنك الآن البدء بالبحث</p>
+                    </div>
+                `;
+            }, 2000);
+        } catch (error) {
+            resultsContainer.innerHTML = `
+                <div class="no-results">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>حدث خطأ في قراءة الملف</p>
+                    <p class="suggest">يرجى التأكد من صحة تنسيق ملف Excel</p>
+                </div>
+            `;
+            console.error('Error:', error);
+        }
+    }
+
+    function switchTab(tab) {
+        currentTab = tab;
+        const searchInput = document.getElementById('searchInput');
+        document.getElementById('nameTab').classList.remove('active');
+        document.getElementById('seatTab').classList.remove('active');
+        document.getElementById(tab + 'Tab').classList.add('active');
+        searchInput.placeholder = tab === 'name' ? 'أدخل اسم الطالب للبحث...' : 'أدخل رقم الجلوس للبحث...';
+        searchInput.value = '';
+        searchInput.focus();
+    }
+
+    function searchStudent() {
+        const input = document.getElementById('searchInput').value.trim();
+        const resultsContainer = document.getElementById('resultsContainer');
+
+        resultsContainer.innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                <p class="loading-text">جاري البحث الرجاء الانتظار...</p>
+            </div>
+        `;
+
+        if (!studentsData.length) {
+            setTimeout(() => {
+                resultsContainer.innerHTML = `
+                    <div class="no-results">
+                        <i class="fas fa-database"></i>
+                        <p>لا توجد بيانات متاحة للبحث</p>
+                        <p class="suggest">تأكد من تحميل ملف Excel بشكل صحيح</p>
+                    </div>
+                `;
+            }, 500);
+            return;
+        }
+
+        if (!input) {
+            setTimeout(() => {
                 resultsContainer.innerHTML = `
                     <div class="no-results">
                         <i class="fas fa-exclamation-circle"></i>
-                        <p>${error.message || 'حدث خطأ في قراءة الملف'}</p>
-                        <p class="suggest">يتم استخدام بيانات تجريبية</p>
+                        <p>الرجاء إدخال ${currentTab === 'name' ? 'اسم الطالب' : 'رقم الجلوس'}</p>
                     </div>
                 `;
-            }
+            }, 500);
+            return;
         }
-    
-        function switchTab(tab) {
-            currentTab = tab;
-            const searchInput = document.getElementById('searchInput');
-            document.getElementById('nameTab').classList.remove('active');
-            document.getElementById('seatTab').classList.remove('active');
-            document.getElementById(tab + 'Tab').classList.add('active');
-            searchInput.placeholder = tab === 'name' ? 'أدخل اسم الطالب للبحث...' : 'أدخل رقم الجلوس للبحث...';
-            searchInput.value = '';
-            searchInput.focus();
+
+        setTimeout(() => performSearch(input), 300);
+    }
+
+    function performSearch(searchTerm) {
+        const resultsContainer = document.getElementById('resultsContainer');
+        let matched = [];
+
+        if (currentTab === 'name') {
+            matched = studentsData.filter(s => s.arabic_name && s.arabic_name.toLowerCase().includes(searchTerm.toLowerCase()));
+        } else {
+            matched = studentsData.filter(s => s.seating_no && s.seating_no.toString() === searchTerm);
         }
-    
-        function searchStudent() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                const input = document.getElementById('searchInput').value.trim();
-                const resultsContainer = document.getElementById('resultsContainer');
-        
-                resultsContainer.innerHTML = `
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        <p class="loading-text">جاري البحث الرجاء الانتظار...</p>
-                    </div>
-                `;
-        
-                if (!studentsData.length) {
-                    setTimeout(() => {
-                        resultsContainer.innerHTML = `
-                            <div class="no-results">
-                                <i class="fas fa-database"></i>
-                                <p>لا توجد بيانات متاحة للبحث</p>
-                                <p class="suggest">يتم استخدام بيانات تجريبية</p>
+
+        if (!matched.length) {
+            resultsContainer.innerHTML = `
+                <div class="no-results">
+                    <i class="fas fa-search-minus"></i>
+                    <p>لا توجد نتائج مطابقة</p>
+                    <p class="suggest">تأكد من ${currentTab === 'name' ? 'اسم الطالب' : 'رقم الجلوس'} وأعد المحاولة</p>
+                </div>
+            `;
+            return;
+        }
+
+        // تخزين النتائج
+        searchResults = matched;
+        currentOffset = 0;
+        resultsContainer.innerHTML = '';
+        renderResultsBatch();
+    }
+
+    function renderResultsBatch() {
+        const resultsContainer = document.getElementById('resultsContainer');
+        const batch = searchResults.slice(currentOffset, currentOffset + PAGE_SIZE);
+
+        batch.forEach((student, index) => {
+            const card = document.createElement('div');
+            card.className = 'student-result fade-in';
+            card.style.animationDelay = `${index * 0.05}s`;
+
+            let subjectsHTML = '';
+            for (const key in student) {
+                if (!['arabic_name', 'seating_no', 'total_degree'].includes(key) && student[key] !== undefined && student[key] !== '') {
+                    const isFail = typeof student[key] === 'number' && student[key] < 50;
+                    subjectsHTML += `
+                        <div class="detail-item">
+                            <div class="detail-label"><i class="fas fa-book"></i> ${key}</div>
+                            <div class="detail-value ${isFail ? 'subject-fail' : ''}">
+                                ${student[key]} ${typeof student[key] === 'number' ? '/ 100' : ''}
                             </div>
-                        `;
-                    }, 500);
-                    return;
-                }
-        
-                if (!input) {
-                    setTimeout(() => {
-                        resultsContainer.innerHTML = `
-                            <div class="no-results">
-                                <i class="fas fa-exclamation-circle"></i>
-                                <p>الرجاء إدخال ${currentTab === 'name' ? 'اسم الطالب' : 'رقم الجلوس'}</p>
-                            </div>
-                        `;
-                    }, 500);
-                    return;
-                }
-        
-                performSearch(input);
-            }, 300);
-        }
-    
-        function performSearch(searchTerm) {
-            const resultsContainer = document.getElementById('resultsContainer');
-            let matched = [];
-    
-            if (currentTab === 'name') {
-                matched = studentsData.filter(s => s.arabic_name && s.arabic_name.toLowerCase().includes(searchTerm.toLowerCase()));
-            } else {
-                matched = studentsData.filter(s => s.seating_no && s.seating_no.toString() === searchTerm);
-            }
-    
-            if (!matched.length) {
-                resultsContainer.innerHTML = `
-                    <div class="no-results">
-                        <i class="fas fa-search-minus"></i>
-                        <p>لا توجد نتائج مطابقة</p>
-                        <p class="suggest">تأكد من ${currentTab === 'name' ? 'اسم الطالب' : 'رقم الجلوس'} وأعد المحاولة</p>
-                    </div>
-                `;
-                return;
-            }
-    
-            resultsContainer.innerHTML = '';
-            searchResults = matched;
-            currentOffset = 0;
-            renderResultsBatch();
-        }
-    
-        function renderResultsBatch() {
-            const resultsContainer = document.getElementById('resultsContainer');
-            const batch = searchResults.slice(currentOffset, currentOffset + PAGE_SIZE);
-    
-            batch.forEach((student, index) => {
-                const card = document.createElement('div');
-                card.className = 'student-result fade-in';
-                card.style.animationDelay = `${index * 0.05}s`;
-    
-                let subjectsHTML = '';
-                for (const key in student) {
-                    if (!['arabic_name', 'seating_no', 'total_degree'].includes(key) && student[key] !== undefined && student[key] !== '') {
-                        const isFail = typeof student[key] === 'number' && student[key] < 50;
-                        subjectsHTML += `
-                            <div class="detail-item">
-                                <div class="detail-label"><i class="fas fa-book"></i> ${key}</div>
-                                <div class="detail-value ${isFail ? 'subject-fail' : ''}">
-                                    ${student[key]} ${typeof student[key] === 'number' ? '/ 100' : ''}
-                                </div>
-                            </div>
-                        `;
-                    }
-                }
-    
-                card.innerHTML = `
-                    <div class="student-header">
-                        <div class="student-name">${student.arabic_name || 'غير معروف'}</div>
-                        <div class="student-seat"><i class="fas fa-id-card"></i> ${student.seating_no || 'غير متوفر'}</div>
-                    </div>
-                    <div class="student-details">
-                        ${subjectsHTML}
-                        <div class="total-degree">
-                            <div class="total-label"><i class="fas fa-star"></i> المجموع الكلي</div>
-                            <div class="total-value">${student.total_degree || '0'} / ${calculateMaxTotal()}</div>
                         </div>
-                    </div>
-                `;
-    
-                resultsContainer.appendChild(card);
-            });
-    
-            currentOffset += PAGE_SIZE;
-        }
-    
-        function calculateMaxTotal() {
-            return 700; 
-        }
-    
-        document.getElementById('searchInput').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') searchStudent();
-        });
-    
-        window.addEventListener('scroll', () => {
-            const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 100;
-            if (nearBottom && currentOffset < searchResults.length) {
-                renderResultsBatch();
+                    `;
+                }
             }
+
+            card.innerHTML = `
+                <div class="student-header">
+                    <div class="student-name">${student.arabic_name || 'غير معروف'}</div>
+                    <div class="student-seat"><i class="fas fa-id-card"></i> ${student.seating_no || 'غير متوفر'}</div>
+                </div>
+                <div class="student-details">
+                    ${subjectsHTML}
+                    <div class="total-degree">
+                        <div class="total-label"><i class="fas fa-star"></i> المجموع الكلي</div>
+                        <div class="total-value">${student.total_degree || '0'} / ${calculateMaxTotal()}</div>
+                    </div>
+                </div>
+            `;
+
+            resultsContainer.appendChild(card);
         });
-    </script>
+
+        currentOffset += PAGE_SIZE;
+
+        if (currentOffset < searchResults.length) {
+            const loadMoreBtn = document.createElement('button');
+            loadMoreBtn.className = 'search-btn';
+            loadMoreBtn.style.margin = '20px auto';
+            loadMoreBtn.innerHTML = '<i class="fas fa-arrow-down"></i> عرض المزيد';
+            loadMoreBtn.onclick = () => {
+                loadMoreBtn.remove();
+                renderResultsBatch();
+            };
+            resultsContainer.appendChild(loadMoreBtn);
+        }
+    }
+
+    function calculateMaxTotal() {
+        return 320; 
+    }
+
+    document.getElementById('searchInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') searchStudent();
+    });
+</script>
+
 </body>
 </html>
